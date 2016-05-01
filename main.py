@@ -4,6 +4,7 @@
 import cv2
 import numpy as np 
 import matplotlib.pyplot as plt 
+import random
 
 def get_size(img):
 	return list(img.shape)[:2]
@@ -40,6 +41,9 @@ class Grab_Cut_Client:
 		'''
 		self.alpha = [0 for i in range(self.size)]
 		self.k = k
+		self.sigma = []
+		self.pi = []
+		self.mu = []
 
 	def _handle_place(self, place):
 		'''
@@ -78,8 +82,16 @@ class Grab_Cut_Client:
 		'''
 		for index in self._U:
 			self.alpha[index] = 1
-		
+		'''
+		Initialise the two distributions with GMM respectively;
+		'''
+		self.mu = [[random.random() for i in range(k)] for j in range(2)]
+		self.sigma = [np.array([random.random() for i in range(k*k)]).reshape([k, k]) for j in range(2)]
+		self.pi = [np.array([random.random() for i in range(k)]) for j in range(2)]
+		self.pi = [x/sum(x) for x in self.pi]
 
+	def iter(self):
+		
 
 	def test(self):
 		print(self._U)
