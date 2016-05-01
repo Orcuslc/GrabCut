@@ -23,9 +23,14 @@ class GMM:
 		self.k = k
 		self.weights = np.asarray([0 for i in range(k)]) # Weight of each component
 		self.means = np.asarray([[0, 0, 0] for i in range(k)]) # Means of each component
-		self.covs = np.asarray([[0, 0, 0], [0, 0, 0], [0, 0, 0]] for i in range(k)) # Covs of each component
+		self.covs = np.asarray([[[0, 0, 0], [0, 0, 0], [0, 0, 0]] for i in range(k)]) # Covs of each component
 		self.cov_inv = np.asarray(np.linalg.inv(cov) for cov in self.covs) # Calculate the inverse of each cov matrix in advance
 		self.cov_det = np.asarray(np.linalg.det(cov) for cov in self.covs) # Calculate the det of each cov matrix;
+		self.pixel_counts = np.asarray([0 for i in range(k)]) # Count of pixels in each components
+		self.pixel_total_count = self.pixel_counts.sum() # The total number of pixels in the GMM
+		# The following two parameters are assistant parameters for counting pixels and calc. pars.
+		self._sums = np.asarray([0, 0, 0] for i in range(k))
+		self._prods = np.asarray([[[0, 0, 0], [0, 0, 0], [0, 0, 0]] for i in range(k)])
 
 	def _prob_pixel_component(self, pixel, ci):
 		'''Calculate the probability of each pixel belonging to the ci_th component of GMM'''
@@ -46,10 +51,20 @@ class GMM:
 		prob = np.asarray([self._prob_pixel_component(pixel, ci) * self.weights[ci] for ci in range(self.k)])
 		return prob.argmax()
 
-	def learning():
+	def add_pixel(self, pixel, ci):
+		'''Add a pixel to the ci_th component of GMM, and refresh the parameters'''
+		self._sums[ci] += pixel
+		self._prods[ci] += np.dot(np.transpose(pixel), pixel)
+		self.pixel_counts[ci] += 1
+		self.pixel_total_count += 1
 
-	def 
-
+	def learning(self):
+		'''Learn the parameters with the data given; Also the 2th step in 'Iterative Minimization'.'''
+		self.weights = [self.pixel_counts[i]/self.pixel_total_counts[i] for i in range(self.k)] # The weight of each comp. is the pixels in the comp. / total pixels.
+		self.means = [self._sums[i]/self.pixel_counts[i] for i in range(self.k)] # The mean of each comp. is the sum of pixels of the comp. / the number of pixels in the comp.
+		self.covs = [self._prods[i]/self.pixel_counts[i] - np.dot(np.transpose(self.means[i]), self.means[i]) for i in range(self.k)] # The cov of each comp.
+		self.cov_inv = np.asarray(np.linalg.inv(cov) for cov in self.covs)
+		self.cov_det = np.asarray(np.linalg.det(cov) for cov in self.covs)
 
 
 class GrabClient:
@@ -57,8 +72,10 @@ class GrabClient:
 	def __init__(self, img):
 		self.img = img
 
-	def init_mask(self, mask):
+	def calc_beta(self):
 		
+	def init_mask(self, mask):
+
 
 
 
