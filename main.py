@@ -39,6 +39,7 @@ class Grab_Cut_Client:
 		The Learning Parameters
 		'''
 		self.alpha = [0 for i in range(self.size)]
+		self.k = k
 
 	def _handle_place(self, place):
 		'''
@@ -72,6 +73,13 @@ class Grab_Cut_Client:
 		height = places[2][0] - places[0][0]
 		self._U = [left + k*self.col + j for k in range(height+1) for j in range(length+1)]
 		self._B = [i for i in range(self.size) if i not in self._U]
+		'''
+		Initialise alpha = 0 for n in B and alpha = 1 for n in U
+		'''
+		for index in self._U:
+			self.alpha[index] = 1
+		
+
 
 	def test(self):
 		print(self._U)
