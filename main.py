@@ -67,13 +67,42 @@ class GMM:
 		self.cov_det = np.asarray(np.linalg.det(cov) for cov in self.covs)
 
 
-class GrabClient:
+class GrabCutClient:
 	'''The engine of grabcut'''
 	def __init__(self, img):
-		self.img = img
+		self.real_img = img
+		self.img = np.asarray(img, dtype = np.float32)
+		self.rows, self.cols = get_size(img)
+		self.gamma = 50
+		self.beta = 0
 
 	def calc_beta(self):
-		
+		'''Calculate Beta -- The Exp Term of Smooth Parameter in Gibbs Energy'''
+		'''beta = 1/(2*average(sqrt(||pixel[i] - pixel[j]||)))'''
+		'''Beta is used to adjust the difference of two nearby pixels in high or low contrast rate'''
+		self._left_diff = self.img[:, 1:] - self.img[:, :-1] # Left-difference
+		self._upleft_diff = self.img[1:, 1:] - self.img[:-1, :-1] # Up-Left difference
+		self._up_diff = self.img[1:, :] - self.img[:-1, :] # Up-difference
+		self._upright_diff = self.img[1:, :-1] - self.img[:-1, 1:] # Up-Right difference
+		beta = (self._left_diff*self._left_diff).sum() + (self._upleft_diff*self._upleft_diff).sum() \
+			+ (self._up_diff*self._up_diff).sum() + (self._upright_diff*self._upright_diff).sum() # According to the formula
+		self.beta = 1/(2*beta/(4*self.cols*self.rows - 3*self.cols - 3*self.rows + 2)) # According to the paper
+
+	def calc_nearby_weight(self):
+		'''Calculate the weight of the edge of each pixel with its nearby pixel, as each pixel is regarded
+			as a vertex of the graph'''
+		'''The weight of each direction is saved in a image the same size of the original image'''
+		'''weight = gamma*exp(-beta*(diff*diff))'''
+		self.left_weight = np.zeros([self.rows, self.cols])
+		self.upleft_weight = np.zeros([self.rows, self.cols])
+		self.up_weight = np.zeros([self.rows, self.cols])
+		self.upright_weight = np.zeros([self.rows, self.cols])
+		# Use the formula to calculate the weight
+		self.left_weight[:, 1:] = self.gamma*np.exp(-self.beta*(self._left_diff*self._left_diff))
+		self.upleft_weight[1:, 1:] = self.gamma*exp(-self.beta*(self._upleft_diff*self._upleft_diff))
+		self.up_weight[1:, :] = self.gamma*exp(-self.beta*(self._up_diff*self._up_diff))
+		self.upright_weight = self.gamma*exp(-self.beta*(self._upright_diff*self._upright_diff))
+
 	def init_mask(self, mask):
 
 
