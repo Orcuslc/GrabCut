@@ -67,7 +67,7 @@ class GMM:
 		self.cov_det = np.asarray(np.linalg.det(cov) for cov in self.covs)
 
 
-class GrabCutClient:
+class GCClient:
 	'''The engine of grabcut'''
 	def __init__(self, img):
 		self.real_img = img
@@ -75,6 +75,27 @@ class GrabCutClient:
 		self.rows, self.cols = get_size(img)
 		self.gamma = 50
 		self.beta = 0
+
+		self._BLUE = [255,0,0]        # rectangle color
+		self._RED = [0,0,255]         # PR BG
+		self._GREEN = [0,255,0]       # PR FG
+		self._BLACK = [0,0,0]         # sure BG
+		self._WHITE = [255,255,255]   # sure FG
+
+		# setting up flags
+		self._rect = list(0,0,1,1)
+		self._drawing = False         # flag for drawing curves
+		self._rectangle = False       # flag for drawing rect
+		self._rect_over = False       # flag to check if rect drawn
+		# se;f._rect_or_mask = 100      # flag for selecting rect or mask mode
+		# self._value = DRAW_FG         # drawing initialized to FG
+		self._thickness = 3           # brush thickness
+		
+		self._GC_BGD = 0	#{'color' : BLACK, 'val' : 0}
+		self._GC_FGD = 1	#{'color' : WHITE, 'val' : 1}
+		self._GC_PR_BGD = 2	#{'color' : GREEN, 'val' : 3}
+		self._GC_PR_FGD = 3	#{'color' : RED, 'val' : 2}
+
 
 	def calc_beta(self):
 		'''Calculate Beta -- The Exp Term of Smooth Parameter in Gibbs Energy'''
@@ -103,142 +124,70 @@ class GrabCutClient:
 		self.up_weight[1:, :] = self.gamma*exp(-self.beta*(self._up_diff*self._up_diff))
 		self.upright_weight = self.gamma*exp(-self.beta*(self._upright_diff*self._upright_diff))
 
-	def init_mask(self, mask):
+	
+	'''The following function is derived from the sample of opencv sources'''
+	def init_mask(self, event, x, y, flags, param):
+		'''Init the mask with interactive movements'''
+		'''Notice: the elements in the mask should be within the follows:
+			"GC_BGD":The pixel belongs to background;
+			"GC_FGD":The pixel belongs to foreground;
+			"GC_PR_BGD":The pixel MAY belongs to background;
+			"GC_PR_FGD":The pixel MAY belongs to foreground;'''
 
+		# Draw Rectangle
+		if event == cv2.EVENT_RBUTTONDOWN:
+			self._rectangle = True
+			self._ix,self._iy = x,y
 
+		elif event == cv2.EVENT_MOUSEMOVE:
+		    if self._rectangle == True:
+		    	cv2.rectangle(self.img,(self._ix,self._iy),(x,y),self._BLUE,2)
+		    	self._rect = list(min(self._ix,x),min(self._iy,y),abs(self._ix-x),abs(self._iy-y))
 
+		elif event == cv2.EVENT_RBUTTONUP:
+			self._rectangle = False
+			self._rect_over = True
+			cv2.rectangle(self.img,(self._ix,self._iy),(x,y),self._BLUE,2)
+			self._rect = list(min(self._ix,x),min(self._iy,y),abs(self._ix-x),abs(self._iy-y))
+			# print(" Now press the key 'n' a few times until no further change \n")
 
+		self._mask = np.zeros([self.rows, self.cols], dtype = np.uint8) # Init the mask
+		self._mask[:, :] = self._GC_BGD
+		self._mask[self._rect[0]:self._rect[0]+self._rect[2], self._rect[1]:self._rect[1]+self._rect[3]] = self._GC_PR_FGD
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# class Grab_Cut_Client:
-# 	'''
-# 	The main class for GrabCut Algorithm.
-# 	'''
-# 	def __init__(self, img, k = 5):
-# 		'''
-# 		Init;
-# 		img : the img to cut;
-# 		k : the number of characters in GMM, with a default value of 5;
-# 		'''
-# 		self.foreground = []
-# 		self.background = []
-# 		'''
-# 		self.T is the trimap consists of B, F, U
-# 		'''
-# 		self._B = []
-# 		self._F = []
-# 		self._U = []
-# 		'''
-# 		The image should be flatten to a one-dimension array
-# 		'''
-# 		self.row, self.col = get_size(img)
-# 		self.size = img.size
-# 		self.img = flat(img)
-# 		'''
-# 		The Learning Parameters
-# 		'''
-# 		self.alpha = [0 for i in range(self.size)]
-# 		self.k = k
-# 		self.sigma = []
-# 		self.pi = []
-# 		self.mu = []
-
-# 	def _handle_place(self, place):
-# 		'''
-# 		Transform the place in [x, y] shape into the index of self.img
-# 		'''
-# 		return self.col*place[0]+place[1]
-
-# 	# def E(self, alpha, k, theta, z):
-# 	# 	'''
-# 	# 	The Gibbs energy
-# 	# 	'''
-
-# 	def init_trimap(self, places, *args):
-# 		'''
-# 		Need to complete later.
+	def init_with_kmeans(self):
+		'''Initialise the BGDGMM and FGDGMM, which are respectively background-model and foreground-model,
+			using kmeans algorithm'''
+		max_iter = 10 # Max-iteration count for Kmeans
+		self._BGDpixels = []
+		self._FGDpixels = [] # The lists storing pixels for background and foreground models
+		bgd = np.where(self._mask == self._GC_BGD or self._mask == self._GC_PR_BGD) # Find the places where pixels in the mask MAY belong to BGD.
+		fgd = np.where(self._mask == self._GC_FGD or self._mask == self._GC_PR_FGD) # Find the places where pixels in the mask MAY belong to FGD.
 		
-# 		Now the init area is determined by the points
-# 		on the corner.
 
-# 		....(i1, j1), ...(i2, j2), ...
-# 		...
-# 		...
-# 		....(i3, j3), ...(i4, j4), ...
-
-# 		The pixels in the rectangle are set to U,
-# 		with pixels outside are set to B.
-# 		'''
-# 		left = self._handle_place(places[0])
-# 		length = places[1][1] - places[0][1]
-# 		height = places[2][0] - places[0][0]
-# 		self._U = [left + k*self.col + j for k in range(height+1) for j in range(length+1)]
-# 		self._B = [i for i in range(self.size) if i not in self._U]
-# 		'''
-# 		Initialise alpha = 0 for n in B and alpha = 1 for n in U
-# 		'''
-# 		for index in self._U:
-# 			self.alpha[index] = 1
-# 		'''
-# 		Initialise the two distributions with GMM respectively;
-# 		We may use kmeans to devide U and B into different GMM models.
-# 		The number of models is k;
-# 		A more concrete explanation:
-# 		http://blog.csdn.net/zouxy09/article/details/8534954
-# 		'''
-# 		# self.mu = [[random.random() for i in range(k)] for j in range(2)]
-# 		# self.sigma = [np.array([random.random() for i in range(k*k)]).reshape([k, k]) for j in range(2)]
-# 		# self.pi = [np.array([random.random() for i in range(k)]) for j in range(2)]
-# 		# self.pi = [x/sum(x) for x in self.pi]
-# 		U = self.img[self._U]
-# 		B = self.img[self._B]
-# 		k1 = kmeans(U, self.k)
-# 		k1.run()
-# 		k2 = kmeans(B, self.k)
-# 		k2.run()
-# 		self._U_components = k1.output()
-# 		self._B_components = k2.output()
-# 		self.pi = []
-
-
-# 	def iter(self):
-
-
-# 	def test(self):
-# 		print(self._U)
-# 		print(self._B)
 
 # if __name__ == '__main__':
 # 	img = np.array([i for i in range(100)]).reshape([10, 10])
 # 	G = Grab_Cut_Client(img)
 # 	G.init_trimap([[1,1], [1,7], [3,1], [3,7]])
 # 	G.test()
+
+if __name__ == '__main__':
+	img = cv2.imread('E:\\Chuan\\Pictures\\ad.jpg', cv2.IMREAD_COLOR)
+	output = np.zeros(img.shape,np.uint8)
+
+	GC = GCClient(img)
+
+	cv2.namedWindow('output')
+	cv2.namedWindow('input')
+	a = cv2.setMouseCallback('input',GC.init_mask)
+	cv2.moveWindow('input',img.shape[1]+10,90)
+
+	while(1):
+		cv2.imshow('output', output)
+		cv2.imshow('input', np.asarray(GC.img, dtype = np.uint8))
+
+		k = 0xFF & cv2.waitKey(1)
+		if k == 27:
+			break
+	cv2.destroyAllWindows()
