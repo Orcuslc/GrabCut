@@ -35,10 +35,14 @@ class GMM:
 	def _prob_pixel_component(self, pixel, ci):
 		'''Calculate the probability of each pixel belonging to the ci_th component of GMM'''
 		'''Using the formula of multivariate normal distribution'''
+		# print(self.cov_inv)
 		inv = self.cov_inv[ci]
 		det = self.cov_det[ci]
 		t = pixel - self.means[ci]
-		return 1/(((2*np.pi)**1.5)*(det**0.5)) * np.exp(-0.5*np.dot(t, inv, np.transpose(t)))
+		nt = np.asarray([t])
+		expo = np.dot(nt, inv)
+		expo = np.dot(expo, np.transpose(nt))
+		return (1/(det**0.5) * np.exp(-0.5*expo))[0]
 
 	def prob_pixel_GMM(self, pixel):	
 		'''Calculate the probability of each pixel belonging to this GMM, which is the sum of 
@@ -48,23 +52,41 @@ class GMM:
 
 	def most_likely_pixel_component(self, pixel):
 		'''Calculate the most likely component that the pixel belongs to'''
-		prob = np.asarray([self._prob_pixel_component(pixel, ci) * self.weights[ci] for ci in range(self.k)])
-		return prob.argmax()
+		g = np.vectorize(self._prob_pixel_component)
+		prob = np.asarray([g(pixel, ci) * self.weights[ci] for ci in range(self.k)])
+		return prob.argmax(0)
+
+	def vec_pix_comp(self, pixel):
+		f = np.vectorize(self.most_likely_pixel_component)
+		return f(pixel)
 
 	def add_pixel(self, pixel, ci):
 		'''Add a pixel to the ci_th component of GMM, and refresh the parameters'''
+		# print(np.asarray(pixel))
+		tp = pixel.copy()
+		tp.shape = (tp.size, 1)
+		op = pixel.copy()
+		op.shape = (1, op.size)
 		self._sums[ci] += pixel
-		self._prods[ci] += np.dot(np.transpose(pixel), pixel)
+		self._prods[ci] += np.dot(tp, op)
 		self.pixel_counts[ci] += 1
 		self.pixel_total_count += 1
 
 	def learning(self):
+		variance = 0.01
 		'''Learn the parameters with the data given; Also the 2th step in 'Iterative Minimization'.'''
-		self.weights = [self.pixel_counts[i]/self.pixel_total_count for i in range(self.k)] # The weight of each comp. is the pixels in the comp. / total pixels.
-		self.means = [self._sums[i]/self.pixel_counts[i] for i in range(self.k)] # The mean of each comp. is the sum of pixels of the comp. / the number of pixels in the comp.
-		self.covs = [self._prods[i]/self.pixel_counts[i] - np.dot(np.transpose(self.means[i]), self.means[i]) for i in range(self.k)] # The cov of each comp.
-		self.cov_inv = np.asarray(np.linalg.inv(cov) for cov in self.covs)
-		self.cov_det = np.asarray(np.linalg.det(cov) for cov in self.covs)
+		self.weights = np.asarray([self.pixel_counts[i]/self.pixel_total_count for i in range(self.k)]) # The weight of each comp. is the pixels in the comp. / total pixels.
+		self.means = np.asarray([self._sums[i]/self.pixel_counts[i] for i in range(self.k)]) # The mean of each comp. is the sum of pixels of the comp. / the number of pixels in the comp.
+		nm = np.asarray([[i] for i in self.means])
+		self.covs = np.asarray([self._prods[i]/self.pixel_counts[i] - np.dot(np.transpose(nm[i]), nm[i]) for i in range(self.k)]) # The cov of each comp.
+		self.cov_det = np.asarray([np.linalg.det(cov) for cov in self.covs])
+		'''Avoid Singular Matrix'''
+		for i in range(self.k):
+			if self.cov_det[i] <= 0:
+				self.covs[i] += np.diag([variance for i in range(3)])
+				self.cov_det[i] = 0.000000001
+		self.cov_inv = np.asarray([np.linalg.inv(cov) for cov in self.covs])
+		# print(self.means)
 
 
 class GCClient:
@@ -164,10 +186,10 @@ class GCClient:
 			using kmeans algorithm'''
 		max_iter = 10 # Max-iteration count for Kmeans
 		'''In the following two indexings, the np.logical_or is needed in place of or'''
-		bgd = np.where(np.logical_or(self._mask == self._GC_BGD, self._mask == self._GC_PR_BGD)) # Find the places where pixels in the mask MAY belong to BGD.
-		fgd = np.where(np.logical_or(self._mask == self._GC_FGD, self._mask == self._GC_PR_FGD)) # Find the places where pixels in the mask MAY belong to FGD.
-		self._BGDpixels = self.img[bgd]
-		self._FGDpixels = self.img[fgd]
+		self._bgd = np.where(np.logical_or(self._mask == self._GC_BGD, self._mask == self._GC_PR_BGD)) # Find the places where pixels in the mask MAY belong to BGD.
+		self._fgd = np.where(np.logical_or(self._mask == self._GC_FGD, self._mask == self._GC_PR_FGD)) # Find the places where pixels in the mask MAY belong to FGD.
+		self._BGDpixels = self.img[self._bgd]
+		self._FGDpixels = self.img[self._fgd]
 		KMB = kmeans(self._BGDpixels, n = self.k) # The Background Model by kmeans
 		KMF = kmeans(self._FGDpixels, n = self.k) # The Foreground Model by kmeans
 		KMB.run()
@@ -181,7 +203,7 @@ class GCClient:
 			# print(self._BGD_by_components[ci])
 			for pixel in self._BGD_by_components[ci]:
 				# pixel = np.asarray([j for j in pixel], dtype = np.float32)
-				print(pixel)
+				# print(pixel)
 				# print('\n')
 				self.BGD_GMM.add_pixel(pixel, ci)
 			for pixel in self._FGD_by_components[ci]:
@@ -189,12 +211,30 @@ class GCClient:
 		self.BGD_GMM.learning()
 		self.FGD_GMM.learning()
 
+	'''The first step of the iteration in the paper: Assign components of GMMs to pixels,
+		(the kn in the paper), which is saved in self.components_index'''
+	def assign_GMM_components(self):
+		self.components_index = np.zeros([self.rows, self.cols], dtype = np.uint)
+		self.components_index[self._bgd] = [i[0] for i in self.BGD_GMM.vec_pix_comp(self.img[self._bgd])]
+		self.components_index[self._fgd] = [i[0] for i in self.FGD_GMM.vec_pix_comp(self.img[self._fgd])]
 
-# if __name__ == '__main__':
-# 	img = np.array([i for i in range(100)]).reshape([10, 10])
-# 	G = Grab_Cut_Client(img)
-# 	G.init_trimap([[1,1], [1,7], [3,1], [3,7]])
-# 	G.test()
+	'''The second step in the iteration: Learn the parameters from GMM models'''
+	def learn_GMM_parameters(self):
+		for ci in range(self.k):
+			# The places where the pixel belongs to the ci_th model and background model.
+			bgd_ci = np.where(np.logical_and(self.components_index == ci, np.logical_or(self._mask == self._GC_BGD, self._mask == self._GC_PR_BGD)))
+			fgd_ci = np.where(np.logical_and(self.components_index == ci, np.logical_or(self._mask == self._GC_FGD, self._mask == self._GC_PR_FGD)))
+			for pixel in self.img[bgd_ci]:
+				self.BGD_GMM.add_pixel(pixel, ci)
+			for pixel in self.img[fgd_ci]:
+				self.FGD_GMM.add_pixel(pixel, ci)
+		self.BGD_GMM.learning()
+		self.FGD_GMM.learning()
+
+	def 
+
+
+
 
 if __name__ == '__main__':
 	img = cv2.imread('E:\\Chuan\\Pictures\\ab.jpg', cv2.IMREAD_COLOR)
@@ -217,5 +257,7 @@ if __name__ == '__main__':
 			break
 		elif k == ord('n'):
 			GC.init_with_kmeans()
+			GC.assign_GMM_components()
+			GC.learn_GMM_parameters()
 
 	cv2.destroyAllWindows()
