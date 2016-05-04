@@ -1,4 +1,5 @@
 # GCGRAPH
+# Maxflow
 
 class Vertex:
 	def __init__(self):
