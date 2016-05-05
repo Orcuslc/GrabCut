@@ -231,7 +231,14 @@ class GCClient:
 		self.BGD_GMM.learning()
 		self.FGD_GMM.learning()
 
-	def 
+	def construct_gcgraph(self):
+		'''Construct a GCGraph with the Gibbs Energy'''
+		'''The vertexs of the graph are the pixels, and the edges are constructed by two parts,
+			the first part of which are the edges that connect each vertex with Sink Point(the background) and the Source Point(the foreground),
+			and the weight of which is the first term in Gibbs Energy;
+			the second part of the edges are those that connect each vertex with its neighbourhoods,
+			and the weight of which is the second term in Gibbs Energy.'''
+		
 
 
 
