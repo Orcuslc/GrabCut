@@ -22,23 +22,24 @@ class GCGraph:
 		self.vertexs = []
 		self.edges = []
 		self.flow = 0
-		self .vertex_count = vertex_count
+		self.vertex_count = vertex_count
 		self.edge_count = edge_count
 
 	def add_vertex(self):
 		v = Vertex()
 		self.vertexs.append(v)
+		return len(self.vertexs) -  1
 
 	def add_edges(self, i, j, w, revw):
 
-		if len(self.edges == 0):
+		if len(self.edges) == 0:
 			self.edges = [0, 0]
 
 		fromI = Edge()
 		fromI.dst = j
 		fromI.next = self.vertexs[i].first
 		fromI.weight = w
-		vertexs[i].first = len(self.edges)
+		self.vertexs[i].first = len(self.edges)
 		self.edges.append(fromI)
 
 		toI = Edge()
@@ -58,7 +59,8 @@ class GCGraph:
 		self.vertexs[i].weight = source_weight - sink_weight
 
 	def max_flow(self):
-		TERMINAL = -1, ORPHAN = -2
+		TERMINAL = -1
+		ORPHAN = -2
 		stub = Vertex()
 		nilNode = stub
 		first = nilNode
@@ -84,7 +86,9 @@ class GCGraph:
 		nilNode.next = 0
 
 		while True:
-			e0 = -1, ei = 1, ej = 0
+			e0 = -1
+			ei = 1
+			ej = 0
 
 			while first != nilNode:
 				v = first

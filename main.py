@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt 
 import random
 from kmeans import kmeans
+from gcgraph import GCGraph
 
 def get_size(img):
 	return list(img.shape)[:2]
@@ -47,7 +48,7 @@ class GMM:
 	def prob_pixel_GMM(self, pixel):	
 		'''Calculate the probability of each pixel belonging to this GMM, which is the sum of 
 			the prob. of the pixel belonging to each component * the weight of the component'''
-		'''Also the first term of Gibbs Energy(inversed;)'''
+		'''Also the first term of Gibbs Energy(negative;)'''
 		return sum([self._prob_pixel_component(pixel, ci) * self.weights[ci] for ci in range(self.k)])
 
 	def most_likely_pixel_component(self, pixel):
@@ -119,6 +120,9 @@ class GCClient:
 		self._GC_FGD = 1	#{'color' : WHITE, 'val' : 1}
 		self._GC_PR_BGD = 2	#{'color' : GREEN, 'val' : 3}
 		self._GC_PR_FGD = 3	#{'color' : RED, 'val' : 2}
+		self.calc_beta()
+		self.calc_nearby_weight()
+
 
 
 	def calc_beta(self):
@@ -143,10 +147,29 @@ class GCClient:
 		self.up_weight = np.zeros([self.rows, self.cols])
 		self.upright_weight = np.zeros([self.rows, self.cols])
 		# Use the formula to calculate the weight
-		self.left_weight[:, 1:] = self.gamma*np.exp(-self.beta*(self._left_diff*self._left_diff))
-		self.upleft_weight[1:, 1:] = self.gamma*exp(-self.beta*(self._upleft_diff*self._upleft_diff))
-		self.up_weight[1:, :] = self.gamma*exp(-self.beta*(self._up_diff*self._up_diff))
-		self.upright_weight = self.gamma*exp(-self.beta*(self._upright_diff*self._upright_diff))
+		for y in range(self.rows):
+			for x in range(self.cols):
+				color = self.img[y, x]
+				if x >= 1:
+					diff = color - self.img[y, x-1]
+					diff.shape = (1, 3)
+					self.left_weight[y, x] = self.gamma*np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
+				if x >= 1 and y >= 1:
+					diff = color - self.img[y-1, x-1]
+					diff.shape = (1, 3)
+					self.upleft_weight[y, x] = self.gamma/np.sqrt(2) * np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
+				if y >= 1:
+					diff = color - self.img[y-1, x]
+					diff.shape = (1, 3)
+					self.up_weight[y, x] = self.gamma*np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
+				if x+1 < self.cols and y >= 1:
+					diff = color - self.img[y-1, x+1]
+					diff.shape = (1, 3)
+					self.upright_weight[y, x] = self.gamma/np.sqrt(2)*np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
+		# self.left_weight[:, 1:] = self.gamma*np.exp(-self.beta*(self._left_diff*self._left_diff))
+		# self.upleft_weight[1:, 1:] = self.gamma*exp(-self.beta*(self._upleft_diff*self._upleft_diff))
+		# self.up_weight[1:, :] = self.gamma*exp(-self.beta*(self._up_diff*self._up_diff))
+		# self.upright_weight = self.gamma*exp(-self.beta*(self._upright_diff*self._upright_diff))
 
 	
 	'''The following function is derived from the sample of opencv sources'''
@@ -231,15 +254,48 @@ class GCClient:
 		self.BGD_GMM.learning()
 		self.FGD_GMM.learning()
 
-	def construct_gcgraph(self):
+	def construct_gcgraph(self, lam):
 		'''Construct a GCGraph with the Gibbs Energy'''
 		'''The vertexs of the graph are the pixels, and the edges are constructed by two parts,
 			the first part of which are the edges that connect each vertex with Sink Point(the background) and the Source Point(the foreground),
 			and the weight of which is the first term in Gibbs Energy;
 			the second part of the edges are those that connect each vertex with its neighbourhoods,
 			and the weight of which is the second term in Gibbs Energy.'''
-		
+		vertex_count = self.img.size
+		edge_count = 2*(4*vertex_count - 3*(self.rows + self.cols) + 2)
+		self.graph = GCGraph(vertex_count, edge_count)
+		for y in range(self.rows):
+			for x in range(self.cols):
+				vertex_index = self.graph.add_vertex() # add-node and return its index
+				color = self.img[y, x]
+				# '''Set t-weights: Calculate the weight of each vertex with Sink node and Source node'''
+				if self._mask[y, x] == self._GC_PR_BGD or self._mask[y, x] == self._GC_PR_FGD:
+					# For each vertex, calculate the first term of G.E. as it be the BGD or FGD, and set them respectively as weight to t/s.
+					fromSource = -np.log(self.BGD_GMM.prob_pixel_GMM(color))
+					toSink = -np.log(self.FGD_GMM.prob_pixel_GMM(color))
+				elif self._mask[y, x] == self._GC_BGD:
+					# For the vertexs that are Background pixels, t-weight with Source = 0, with Sink = lam
+					fromSource = 0
+					toSink = lam
+				else:
+					# GC_FGD
+					fromSource = lam
+					toSink = 0
+				self.graph.add_term_weights(vertex_index, fromSource, toSink)
 
+				'''Set n-weights and n-link, Calculate the weights between two neighbour vertexs, which is also the second term in Gibbs Energy(the smooth term)'''
+				if x > 0:
+					w = self.left_weight[y, x]
+					self.graph.add_edges(vertex_index, vertex_index-1, w, w)
+				if x > 0 and y > 0:
+					w = self.upleft_weight[y, x]
+					self.graph.add_edges(vertex_index, vertex_index-self.cols-1, w, w)
+				if y > 0:
+					w = self.up_weight[y, x]
+					self.graph.add_edges(vertex_index, vertex_index-self.cols, w, w)
+				if x < self.cols - 1 and y > 0:
+					w = self.upright_weight[y, x]
+					self.graph.add_edges(vertex_index, vertex_index-self.cols+1, w, w)
 
 
 
@@ -266,5 +322,5 @@ if __name__ == '__main__':
 			GC.init_with_kmeans()
 			GC.assign_GMM_components()
 			GC.learn_GMM_parameters()
-
+			GC.construct_gcgraph(0.1)
 	cv2.destroyAllWindows()
