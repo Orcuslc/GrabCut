@@ -97,8 +97,10 @@ class GCClient:
 
 		self.real_img = img
 		self.img = np.asarray(img, dtype = np.float32)
+		self.img2 = img
 		self.rows, self.cols = get_size(img)
 		self.gamma = 50
+		self.lam = 9*self.gamma
 		self.beta = 0
 
 		self._BLUE = [255,0,0]        # rectangle color
@@ -201,6 +203,7 @@ class GCClient:
 		self._mask = np.zeros([self.rows, self.cols], dtype = np.uint8) # Init the mask
 		self._mask[:, :] = self._GC_BGD
 		self._mask[self._rect[0]:self._rect[0]+self._rect[2], self._rect[1]:self._rect[1]+self._rect[3]] = self._GC_PR_FGD
+		self._mask0 = self._mask.copy()
 
 	def init_with_kmeans(self):
 		print(self.cols*self.rows)
@@ -297,10 +300,42 @@ class GCClient:
 					w = self.upright_weight[y, x]
 					self.graph.add_edges(vertex_index, vertex_index-self.cols+1, w, w)
 
+	def estimate_segmentation(self):
+		self.graph.max_flow()
+		for y in range(self.rows):
+			for x in range(self.cols):
+				if self._mask[y, x] == self._GC_PR_FGD or self._mask[y, x] == self._GC_PR_FGD:
+					if self.graph.insource_segment(y*self.cols+x): # Vertex Index
+						self._mask[y, x] = self._GC_PR_FGD
+					else:
+						self._mask[y, x] = self._GC_PR_BGD
+
+	def iter(self):
+		self.assign_GMM_components()
+		self.learn_GMM_parameters()
+		self.construct_gcgraph(self.lam)
+		self.estimate_segmentation()
+
+	def run(self):
+		self.init_with_kmeans()
+		self.assign_GMM_components()
+		self.learn_GMM_parameters()
+		self.construct_gcgraph(self.lam)
+		self.estimate_segmentation()
+
+	def show(self, output):
+		FGD = np.where(np.logical_and(np.logical_or(self._mask == 1, self._mask == 3), self._mask0 == 3))
+		# FGD = np.where((self._mask == 1) + (self._mask == 3), 255, 0).astype('uint8')
+		output[FGD] = self.img[FGD]
+		output = output.astype(np.uint8)
+		# output = cv2.bitwise_and(self.img2, self.img2, mask = FGD)
+		print('Press N to continue')
+		return output
+
 
 
 if __name__ == '__main__':
-	img = cv2.imread('E:\\Chuan\\Pictures\\ab.jpg', cv2.IMREAD_COLOR)
+	img = cv2.imread('E:\\Chuan\\Pictures\\a.jpg', cv2.IMREAD_COLOR)
 	output = np.zeros(img.shape,np.uint8)
 
 	GC = GCClient(img, k = 5)
@@ -308,7 +343,9 @@ if __name__ == '__main__':
 	cv2.namedWindow('output')
 	cv2.namedWindow('input')
 	a = cv2.setMouseCallback('input',GC.init_mask)
-	cv2.moveWindow('input',img.shape[1]+10,90)
+	cv2.moveWindow('input',img.shape[0]+100, img.shape[1]+100)
+
+	count = 0
 
 	while(1):
 		cv2.imshow('output', output)
@@ -319,8 +356,11 @@ if __name__ == '__main__':
 		if k == 27:
 			break
 		elif k == ord('n'):
-			GC.init_with_kmeans()
-			GC.assign_GMM_components()
-			GC.learn_GMM_parameters()
-			GC.construct_gcgraph(0.1)
+			if count == 0:
+				GC.run()
+				count += 1
+			else:
+				GC.iter()
+			output = GC.show(output)
+
 	cv2.destroyAllWindows()

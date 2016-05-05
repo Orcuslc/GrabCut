@@ -217,8 +217,8 @@ class GCGraph:
 						orphans.append(u)
 						u.parent = ORPHAN
 					ei = self.edges[ei].next
-		return flow
+		return self.flow
 
-	def insource_segment(i):
+	def insource_segment(self, i):
 		return self.vertexs[i].t == 0
 
