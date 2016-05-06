@@ -1,5 +1,43 @@
-# GrabCut 
-# Copyleft 2016 Orcuslc
+# /*M///////////////////////////////////////////////////////////////////////////////////////
+# //
+# //  IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
+# //
+# //  By downloading, copying, installing or using the software you agree to this license.
+# //  If you do not agree to this license, do not download, install,
+# //  copy or use the software.
+# //
+# //
+# //                        Intel License Agreement
+# //                For Open Source Computer Vision Library
+# //
+# // Copyright (C) 2000, Intel Corporation, all rights reserved.
+# // Third party copyrights are property of their respective owners.
+# //
+# // Redistribution and use in source and binary forms, with or without modification,
+# // are permitted provided that the following conditions are met:
+# //
+# //   * Redistribution's of source code must retain the above copyright notice,
+# //     this list of conditions and the following disclaimer.
+# //
+# //   * Redistribution's in binary form must reproduce the above copyright notice,
+# //     this list of conditions and the following disclaimer in the documentation
+# //     and/or other materials provided with the distribution.
+# //
+# //   * The name of Intel Corporation may not be used to endorse or promote products
+# //     derived from this software without specific prior written permission.
+# //
+# // This software is provided by the copyright holders and contributors "as is" and
+# // any express or implied warranties, including, but not limited to, the implied
+# // warranties of merchantability and fitness for a particular purpose are disclaimed.
+# // In no event shall the Intel Corporation or contributors be liable for any direct,
+# // indirect, incidental, special, exemplary, or consequential damages
+# // (including, but not limited to, procurement of substitute goods or services;
+# // loss of use, data, or profits; or business interruption) however caused
+# // and on any theory of liability, whether in contract, strict liability,
+# // or tort (including negligence or otherwise) arising in any way out of
+# // the use of this software, even if advised of the possibility of such damage.
+# //
+# //M*/
 
 import cv2
 import numpy as np 
@@ -15,7 +53,7 @@ def flat(img):
 	return img.reshape([1, img.size])[0]
 
 class GMM:
-	'''The GMM algorithm'''
+	'''The GMM: Gaussian Mixture Model algorithm'''
 	'''Each point in the image belongs to a GMM, and because each pixel owns
 		three channels: RGB, so each component owns three means, 9 covs and a weight.'''
 	
@@ -95,7 +133,6 @@ class GCClient:
 	def __init__(self, img, k):
 		self.k = k # The number of components in each GMM model
 
-		self.real_img = img
 		self.img = np.asarray(img, dtype = np.float32)
 		self.img2 = img
 		self.rows, self.cols = get_size(img)
@@ -188,10 +225,11 @@ class GCClient:
 			self._rectangle = True
 			self._ix,self._iy = x,y
 
-		# elif event == cv2.EVENT_MOUSEMOVE:
-		#     if self._rectangle == True:
-		#     	cv2.rectangle(self.img,(self._ix,self._iy),(x,y),self._BLUE,2)
-		    	# self._rect = [min(self._ix,x),min(self._iy,y),abs(self._ix-x),abs(self._iy-y)]
+		elif event == cv2.EVENT_MOUSEMOVE:
+		    if self._rectangle == True:
+		    	self.img = self.img2.copy()
+		    	cv2.rectangle(self.img,(self._ix,self._iy),(x,y),self._BLUE,2)
+		    	self._rect = [min(self._ix,x),min(self._iy,y),abs(self._ix-x),abs(self._iy-y)]
 
 		elif event == cv2.EVENT_RBUTTONUP:
 			self._rectangle = False
@@ -200,9 +238,11 @@ class GCClient:
 			self._rect = [min(self._ix,x),min(self._iy,y),abs(self._ix-x),abs(self._iy-y)]
 			# print(" Now press the key 'n' a few times until no further change \n")
 
+		# print(self._ix, self._iy)
 		self._mask = np.zeros([self.rows, self.cols], dtype = np.uint8) # Init the mask
 		self._mask[:, :] = self._GC_BGD
-		self._mask[self._rect[0]:self._rect[0]+self._rect[2], self._rect[1]:self._rect[1]+self._rect[3]] = self._GC_PR_FGD
+		# Notice : The x and y axis in CV2 are inversed to those in numpy.
+		self._mask[self._rect[1]:self._rect[1]+self._rect[3], self._rect[0]:self._rect[0]+self._rect[2]] = self._GC_PR_FGD
 		self._mask0 = self._mask.copy()
 
 	def init_with_kmeans(self):
@@ -324,6 +364,7 @@ class GCClient:
 		self.estimate_segmentation()
 
 	def show(self, output):
+		# 
 		FGD = np.where(np.logical_and(np.logical_or(self._mask == 1, self._mask == 3), self._mask0 == 3))
 		# FGD = np.where((self._mask == 1) + (self._mask == 3), 255, 0).astype('uint8')
 		output[FGD] = self.img[FGD]
@@ -335,7 +376,7 @@ class GCClient:
 
 
 if __name__ == '__main__':
-	img = cv2.imread('E:\\Chuan\\Pictures\\a.jpg', cv2.IMREAD_COLOR)
+	img = cv2.imread('lena.jpg', cv2.IMREAD_COLOR)
 	output = np.zeros(img.shape,np.uint8)
 
 	GC = GCClient(img, k = 5)
