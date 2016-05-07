@@ -32,21 +32,24 @@ class GCGraph:
 
 	def add_edges(self, i, j, w, revw):
 
-		if len(self.edges) == 0:
-			self.edges = [0, 0]
+		a = len(self.edges)
+		# As is said in the C++ code, if edges.size() == 0, then resize edges to 2.
+
+		if a == 0:
+			a = 2
 
 		fromI = Edge()
 		fromI.dst = j
 		fromI.next = self.vertexs[i].first
 		fromI.weight = w
-		self.vertexs[i].first = len(self.edges)
+		self.vertexs[i].first = a
 		self.edges.append(fromI)
 
 		toI = Edge()
 		toI.dst = i
 		toI.next = self.vertexs[j].first
 		toI.weight = revw
-		self.vertexs[j].first = len(self.edges)
+		self.vertexs[j].first = a
 		self.edges.append(toI)
 
 	def add_term_weights(self, i, source_weight, sink_weight):
@@ -85,6 +88,7 @@ class GCGraph:
 		last.next = nilNode
 		nilNode.next = 0
 
+		# Search Path -> Augment Graph -> Restore Trees
 		while True:
 			e0 = -1
 			ei = 1
@@ -120,6 +124,7 @@ class GCGraph:
 						break
 				first = first.next
 				v.next = 0
+			
 			if e0 <= 0:
 				break
 
@@ -132,7 +137,7 @@ class GCGraph:
 						break
 					weight = self.edges[ei^k].weight
 					minWeight = min(minWeight, weight)
-					v = self.edges[ei].dst
+					v = self.vertexs[self.edges[ei].dst]
 				weight = abs(v.weight)
 				minWeight = min(minWeight, weight)
 			self.edges[e0].weight -= minWeight
@@ -140,7 +145,7 @@ class GCGraph:
 			self.flow += minWeight
 
 			for k in range(1, -1, -1):
-				v = self.vertexs[self.edges[e0^k]].dst
+				v = self.vertexs[self.edges[e0^k].dst]
 				while True:
 					ei = v.parent
 					if ei < 0:
@@ -150,7 +155,11 @@ class GCGraph:
 					if self.edges[ei^k].weight == 0:
 						orphans.append(v)
 						v.parent = ORPHAN
-					v = self.vertexs[self.edges[ei]].dst
+					v = self.vertexs[self.edges[ei].dst]
+				v.weight = v.weight + minWeight*(1-k*2)
+				if v.weight == 0:
+					orphans.append(v)
+					v.parent = ORPHAN
 			curr_ts += 1
 			while len(orphans) != 0:
 				v2 = orphans[-1]
@@ -193,7 +202,7 @@ class GCGraph:
 							u.ts = curr_ts
 							d -= 1
 							u.dist = d
-							u = self.vertexs[self.edges[u.parent]].dst
+							u = self.vertexs[self.edges[u.parent].dst]
 
 					ei = self.edges[ei].next
 
@@ -206,14 +215,14 @@ class GCGraph:
 				v2.ts = 0
 				ei = v2.first
 				while ei != 0:
-					u = self.vertexs[self.edges[ei]].dst
+					u = self.vertexs[self.edges[ei].dst]
 					ej = u.parent
 					if u.t != vt or (not ej):
 						continue
 					if self.edges[ei^(vt^1)].weight and (not u.next):
 						u.next = nilNode
 						last = last.next = u
-					if ej > 0 and self.vertexs[self.edges[ej]].dst == v2:
+					if ej > 0 and self.vertexs[self.edges[ej].dst] == v2:
 						orphans.append(u)
 						u.parent = ORPHAN
 					ei = self.edges[ei].next
