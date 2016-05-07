@@ -1,43 +1,5 @@
-# /*M///////////////////////////////////////////////////////////////////////////////////////
-# //
-# //  IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
-# //
-# //  By downloading, copying, installing or using the software you agree to this license.
-# //  If you do not agree to this license, do not download, install,
-# //  copy or use the software.
-# //
-# //
-# //                        Intel License Agreement
-# //                For Open Source Computer Vision Library
-# //
-# // Copyright (C) 2000, Intel Corporation, all rights reserved.
-# // Third party copyrights are property of their respective owners.
-# //
-# // Redistribution and use in source and binary forms, with or without modification,
-# // are permitted provided that the following conditions are met:
-# //
-# //   * Redistribution's of source code must retain the above copyright notice,
-# //     this list of conditions and the following disclaimer.
-# //
-# //   * Redistribution's in binary form must reproduce the above copyright notice,
-# //     this list of conditions and the following disclaimer in the documentation
-# //     and/or other materials provided with the distribution.
-# //
-# //   * The name of Intel Corporation may not be used to endorse or promote products
-# //     derived from this software without specific prior written permission.
-# //
-# // This software is provided by the copyright holders and contributors "as is" and
-# // any express or implied warranties, including, but not limited to, the implied
-# // warranties of merchantability and fitness for a particular purpose are disclaimed.
-# // In no event shall the Intel Corporation or contributors be liable for any direct,
-# // indirect, incidental, special, exemplary, or consequential damages
-# // (including, but not limited to, procurement of substitute goods or services;
-# // loss of use, data, or profits; or business interruption) however caused
-# // and on any theory of liability, whether in contract, strict liability,
-# // or tort (including negligence or otherwise) arising in any way out of
-# // the use of this software, even if advised of the possibility of such damage.
-# //
-# //M*/
+# Copyright(C) 2016 Orcuslc
+# GrabCut
 
 import cv2
 import numpy as np 
@@ -81,7 +43,9 @@ class GMM:
 		nt = np.asarray([t])
 		expo = np.dot(nt, inv)
 		expo = np.dot(expo, np.transpose(nt))
-		return (1/(det**0.5) * np.exp(-0.5*expo))[0]
+		# print(det)
+		# print(expo)
+		return (1/np.sqrt(det) * np.exp(-0.5*expo))[0]
 
 	def prob_pixel_GMM(self, pixel):	
 		'''Calculate the probability of each pixel belonging to this GMM, which is the sum of 
@@ -102,9 +66,9 @@ class GMM:
 	def add_pixel(self, pixel, ci):
 		'''Add a pixel to the ci_th component of GMM, and refresh the parameters'''
 		# print(np.asarray(pixel))
-		tp = pixel.copy()
+		tp = pixel.copy().astype(np.float32)
 		tp.shape = (tp.size, 1)
-		op = pixel.copy()
+		op = pixel.copy().astype(np.float32)
 		op.shape = (1, op.size)
 		self._sums[ci] += pixel
 		self._prods[ci] += np.dot(tp, op)
@@ -113,6 +77,8 @@ class GMM:
 
 	def learning(self):
 		variance = 0.01
+		zeros = np.where(np.asarray(self.pixel_counts) == 0)
+		notzeros = np.where(np.asarray(self.pixel_counts) != 0)
 		'''Learn the parameters with the data given; Also the 2th step in 'Iterative Minimization'.'''
 		self.weights = np.asarray([self.pixel_counts[i]/self.pixel_total_count for i in range(self.k)]) # The weight of each comp. is the pixels in the comp. / total pixels.
 		self.means = np.asarray([self._sums[i]/self.pixel_counts[i] for i in range(self.k)]) # The mean of each comp. is the sum of pixels of the comp. / the number of pixels in the comp.
@@ -121,11 +87,13 @@ class GMM:
 		self.cov_det = np.asarray([np.linalg.det(cov) for cov in self.covs])
 		'''Avoid Singular Matrix'''
 		for i in range(self.k):
-			if self.cov_det[i] <= 0:
+			while self.cov_det[i] <= 0:
 				self.covs[i] += np.diag([variance for i in range(3)])
-				self.cov_det[i] = 0.000000001
+				self.cov_det[i] = np.linalg.det(self.covs[i])
 		self.cov_inv = np.asarray([np.linalg.inv(cov) for cov in self.covs])
 		# print(self.means)
+
+
 
 
 class GCClient:
@@ -136,7 +104,7 @@ class GCClient:
 		self.img = np.asarray(img, dtype = np.float32)
 		self.img2 = img
 		self.rows, self.cols = get_size(img)
-		self.gamma = 50
+		self.gamma = 500
 		self.lam = 9*self.gamma
 		self.beta = 0
 
@@ -186,25 +154,29 @@ class GCClient:
 		self.up_weight = np.zeros([self.rows, self.cols])
 		self.upright_weight = np.zeros([self.rows, self.cols])
 		# Use the formula to calculate the weight
-		for y in range(self.rows):
-			for x in range(self.cols):
-				color = self.img[y, x]
-				if x >= 1:
-					diff = color - self.img[y, x-1]
-					diff.shape = (1, 3)
-					self.left_weight[y, x] = self.gamma*np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
-				if x >= 1 and y >= 1:
-					diff = color - self.img[y-1, x-1]
-					diff.shape = (1, 3)
-					self.upleft_weight[y, x] = self.gamma/np.sqrt(2) * np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
-				if y >= 1:
-					diff = color - self.img[y-1, x]
-					diff.shape = (1, 3)
-					self.up_weight[y, x] = self.gamma*np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
-				if x+1 < self.cols and y >= 1:
-					diff = color - self.img[y-1, x+1]
-					diff.shape = (1, 3)
-					self.upright_weight[y, x] = self.gamma/np.sqrt(2)*np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
+		# for y in range(self.rows):
+		# 	for x in range(self.cols):
+		# 		color = self.img[y, x]
+		# 		if x >= 1:
+		# 			diff = color - self.img[y, x-1]
+		# 			diff.shape = (1, 3)
+		# 			self.left_weight[y, x] = self.gamma*np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
+		# 		if x >= 1 and y >= 1:
+		# 			diff = color - self.img[y-1, x-1]
+		# 			diff.shape = (1, 3)
+		# 			self.upleft_weight[y, x] = self.gamma/np.sqrt(2) * np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
+		# 		if y >= 1:
+		# 			diff = color - self.img[y-1, x]
+		# 			diff.shape = (1, 3)
+		# 			self.up_weight[y, x] = self.gamma*np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
+		# 		if x+1 < self.cols and y >= 1:
+		# 			diff = color - self.img[y-1, x+1]
+		# 			diff.shape = (1, 3)
+		# 			self.upright_weight[y, x] = self.gamma/np.sqrt(2)*np.exp(-self.beta*np.dot(diff, np.transpose(diff)))
+		
+
+
+
 		# self.left_weight[:, 1:] = self.gamma*np.exp(-self.beta*(self._left_diff*self._left_diff))
 		# self.upleft_weight[1:, 1:] = self.gamma*exp(-self.beta*(self._upleft_diff*self._upleft_diff))
 		# self.up_weight[1:, :] = self.gamma*exp(-self.beta*(self._up_diff*self._up_diff))
@@ -242,7 +214,7 @@ class GCClient:
 		self._mask = np.zeros([self.rows, self.cols], dtype = np.uint8) # Init the mask
 		self._mask[:, :] = self._GC_BGD
 		# Notice : The x and y axis in CV2 are inversed to those in numpy.
-		self._mask[self._rect[1]:self._rect[1]+self._rect[3], self._rect[0]:self._rect[0]+self._rect[2]] = self._GC_PR_FGD
+		self._mask[self._rect[1]+self._thickness:self._rect[1]+self._rect[3]-self._thickness, self._rect[0]+self._thickness:self._rect[0]+self._rect[2]-self._thickness] = self._GC_PR_FGD
 		self._mask0 = self._mask.copy()
 
 	def init_with_kmeans(self):
@@ -344,7 +316,7 @@ class GCClient:
 		self.graph.max_flow()
 		for y in range(self.rows):
 			for x in range(self.cols):
-				if self._mask[y, x] == self._GC_PR_FGD or self._mask[y, x] == self._GC_PR_FGD:
+				if self._mask[y, x] == self._GC_PR_BGD or self._mask[y, x] == self._GC_PR_FGD:
 					if self.graph.insource_segment(y*self.cols+x): # Vertex Index
 						self._mask[y, x] = self._GC_PR_FGD
 					else:
@@ -365,7 +337,8 @@ class GCClient:
 
 	def show(self, output):
 		# 
-		FGD = np.where(np.logical_and(np.logical_or(self._mask == 1, self._mask == 3), self._mask0 == 3))
+		# FGD = np.where(np.logical_and(np.logical_or(self._mask == 1, self._mask == 3), self._mask0 == 3))
+		FGD = np.where(np.logical_or(self._mask==1, self._mask==3))
 		# FGD = np.where((self._mask == 1) + (self._mask == 3), 255, 0).astype('uint8')
 		output[FGD] = self.img[FGD]
 		output = output.astype(np.uint8)

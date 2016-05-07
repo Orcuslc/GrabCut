@@ -68,14 +68,14 @@ def onmouse(event, x, y, flags, param):
 	# 		cv2.circle(mask,(x,y),thickness,value['val'],-1)
 
 if __name__ == '__main__':
-	img = cv2.imread('E:\\Chuan\\Pictures\\ad.jpg', cv2.IMREAD_COLOR)
+	img = cv2.imread('E:\\Chuan\\Pictures\\a.jpg', cv2.IMREAD_COLOR)
 	img2 = img.copy()
 	output = np.zeros(img.shape,np.uint8)   
 
 	cv2.namedWindow('output')
 	cv2.namedWindow('input')
 	a = cv2.setMouseCallback('input',onmouse)
-	cv2.moveWindow('input',img.shape[1]+10,90)
+	cv2.moveWindow('input',img.shape[1]+10,90) 
 
 	while(1):
 		cv2.imshow('output', output)
@@ -84,4 +84,9 @@ if __name__ == '__main__':
 		k = 0xFF & cv2.waitKey(1)
 		if k == 27:
 			break
+		if k == ord('n'):
+			mask = np.zeros(img.shape, np.uint8)
+			mask[20:80, 30:100] = 1
+			output = cv2.bitwise_and(img2, img2, mask = mask)
+
 	cv2.destroyAllWindows()
