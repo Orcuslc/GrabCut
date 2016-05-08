@@ -29,6 +29,7 @@ class kmeans:
 		as -1;
 		'''
 		self.maxiter = maxiter
+		# self.count = 0
 
 	def _get_size(self):
 		return list(self.A.shape)[:2]
@@ -49,12 +50,11 @@ class kmeans:
 		for i in range(self.row):
 			dist_list = []
 			for j in self.centers:
-				dist_list.append(self._get_distance(self.A[i, 0], j[0]))
-			key = self._get_min_dis(dist_list)
+				dist_list.append(self._get_distance(np.asarray(self.A[i, 0]), np.asarray(j[0])))
 			self.A[i, -1] = self.centers[key][-1]
 
 	def _get_distance(self, a, b):
-		return np.sqrt(sum((a-b)**2))
+		return np.sqrt()
 
 	# @jit
 	def _get_min_dis(self, dist_list):
@@ -72,24 +72,26 @@ class kmeans:
 		for data in self.A:
 			center_type = data[-1]
 			self.data_by_center[center_type].append(data)
-		try:
-			self.centers = [list(sum(self.data_by_center[i])/len(self.data_by_center[i])) \
+		# try:
+		self.centers = [list(sum(self.data_by_center[i])/len(self.data_by_center[i])) \
 							for i in range(len(self.data_by_center))]
-		except ZeroDivisionError:
-			self.centers = self._init_centers()
-			self._determine_types()
-			count += 1
-		for i in range(self.n):
-			self.centers[i][-1] = int(self.centers[i][-1])
+		# except ZeroDivisionError:
+		# 	self.centers = self._init_centers()
+		# 	self._determine_types()
+		# 	self.count += 1
+		# for i in range(self.n):
+		# 	self.centers[i][-1] = int(self.centers[i][-1])
 
 	def run(self):
-		count = 0
-		flag = 0
-		while True:
-			flag += 1
-			self._iter(count)
-			if flag - count >= self.maxiter:
-				break
+		# count = 0
+		# flag = 0
+		# while True:
+		# 	flag += 1
+		# 	self._iter(count)
+		# 	if flag - count >= self.maxiter:
+		# 		break
+		for i in range(self.maxiter):
+			self._iter()
 
 	def output(self):
 		return np.asarray([[data[0] for data in num] for num in self.data_by_center])

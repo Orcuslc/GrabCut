@@ -1,14 +1,17 @@
 # GCGRAPH
 # Maxflow
 
+class store:
+	'''The class to store pointers'''
+
 class Vertex:
 	def __init__(self):
 		self.next = None # Initialized and used in maxflow() only
-		self.parent = 0
-		self.first = 0
-		self.ts = 0
-		self.dist = 0
-		self.weight = 0.0
+		self.parent = None
+		self.first = None
+		self.ts = None
+		self.dist = None
+		self.weight = 0
 		self.t = None
 
 class Edge:
@@ -58,7 +61,7 @@ class GCGraph:
 			source_weight += dw
 		else:
 			sink_weight -= dw
-		self.flow += min(source_weight, sink_weight)
+		self.flow += source_weight if source_weight < sink_weight else sink_weight
 		self.vertexs[i].weight = source_weight - sink_weight
 
 	def max_flow(self):
@@ -88,10 +91,11 @@ class GCGraph:
 		last.next = nilNode
 		nilNode.next = 0
 
+
 		# Search Path -> Augment Graph -> Restore Trees
 		while True:
 			e0 = -1
-			ei = 1
+			ei = 0
 			ej = 0
 
 			while first != nilNode:
@@ -165,6 +169,7 @@ class GCGraph:
 				v2 = orphans[-1]
 				orphans.pop()
 				minDist = float('inf')
+				d = float('inf')
 				e0 = 0
 				vt = v2.t
 				ei = v2.first
@@ -198,7 +203,7 @@ class GCGraph:
 							minDist = d
 							e0 = ei
 						u = self.vertexs[self.edges[ei].dst]
-						while u != curr_ts:
+						while u.ts != curr_ts:
 							u.ts = curr_ts
 							d -= 1
 							u.dist = d
@@ -226,6 +231,7 @@ class GCGraph:
 						orphans.append(u)
 						u.parent = ORPHAN
 					ei = self.edges[ei].next
+		# print([self.vertexs[i].t for i in range(len(self.vertexs))])
 		return self.flow
 
 	def insource_segment(self, i):
