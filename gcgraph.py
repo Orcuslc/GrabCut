@@ -1,8 +1,10 @@
 # GCGRAPH
 # Maxflow
 
-class store:
-	'''The class to store pointers'''
+class Pointer:
+	def __init__(self, var):
+		self.value = var
+
 
 class Vertex:
 	def __init__(self):
