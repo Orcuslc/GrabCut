@@ -3,7 +3,7 @@
 
 class Pointer:
 	def __init__(self, var):
-		self.value = var
+		self.var = var
 
 
 class Vertex:
@@ -70,10 +70,11 @@ class GCGraph:
 		TERMINAL = -1
 		ORPHAN = -2
 		stub = Vertex()
+		stub = Pointer(stub)
 		nilNode = stub
 		first = nilNode
 		last = nilNode
-		stub.next = nilNode
+		stub.var.next = nilNode
 		curr_ts = 0
 		
 		orphans = []
@@ -83,15 +84,17 @@ class GCGraph:
 			v = self.vertexs[i]
 			v.ts = 0
 			if v.weight != 0:
-				last = last.next = v
+				last.var = last.var.next = v
 				v.dist = 1
 				v.parent = TERMINAL
 				v.t = v.weight < 0
 			else:
 				v.parent = 0
-		first = first.next
-		last.next = nilNode
-		nilNode.next = 0
+			print(first.var.next)
+		first.var = first.var.next
+		last.var.next = nilNode
+		nilNode.var.next = 0
+		print(first.var == nilNode.var)
 
 
 		# Search Path -> Augment Graph -> Restore Trees
@@ -100,10 +103,11 @@ class GCGraph:
 			ei = 0
 			ej = 0
 
-			while first != nilNode:
+			while first.var != nilNode.var:
+				print(1)
 				v = first
 				if v.parent:
-					vt = v.t
+					vt = v.var.t
 					ei = v.first
 					while ei != 0:
 						if self.edges[ei^vt].weight == 0:
