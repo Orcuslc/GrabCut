@@ -137,7 +137,7 @@ class GCClient:
 		self.img = np.asarray(img, dtype = np.float32)
 		self.img2 = img
 		self.rows, self.cols = get_size(img)
-		self.gamma = 500
+		self.gamma = 50
 		self.lam = 9*self.gamma
 		self.beta = 0
 
@@ -399,6 +399,7 @@ class GCClient:
 					if self.graph.insource_segment(y*self.cols+x): # Vertex Index
 						self._mask[y, x] = self._GC_PR_FGD
 					else:
+						# print(y, x)
 						self._mask[y, x] = self._GC_PR_BGD
 
 	def iter(self, n):
@@ -438,7 +439,7 @@ class GCClient:
 
 
 if __name__ == '__main__':
-	img = cv2.imread('lena.jpg', cv2.IMREAD_COLOR)
+	img = cv2.imread('cat.jpg', cv2.IMREAD_COLOR)
 	output = np.zeros(img.shape,np.uint8)
 
 	GC = GCClient(img, k = 5)
