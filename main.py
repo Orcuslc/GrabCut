@@ -436,6 +436,9 @@ class GCClient:
 		print('Press N to continue')
 		return output
 
+	def update_mask_by_user(self):
+		
+
 
 
 if __name__ == '__main__':
