@@ -14,7 +14,7 @@ def timeit(func):
 		time1 = time.time()
 		result = func(*args, **kw)
 		time2 = time.time()
-		print(func.__name__, time2-time1)
+		# print(func.__name__, time2-time1)
 		return result
 	return wrapper
 
@@ -147,6 +147,11 @@ class GCClient:
 		self._BLACK = [0,0,0]         # sure BG
 		self._WHITE = [255,255,255]   # sure FG
 
+		self._DRAW_BG = {'color':self._BLACK, 'val':0}
+		self._DRAW_FG = {'color':self._WHITE, 'val':1}
+		self._DRAW_PR_FG = {'color':self._GREEN, 'val':3}
+		self._DRAW_PR_BG = {'color':self._RED, 'val':2}
+
 		# setting up flags
 		self._rect = [0, 0, 1, 1]
 		self._drawing = False         # flag for drawing curves
@@ -162,6 +167,10 @@ class GCClient:
 		self._GC_PR_FGD = 3	#{'color' : RED, 'val' : 2}
 		self.calc_beta()
 		self.calc_nearby_weight()
+
+		self._DRAW_VAL = None
+
+		self._mask = np.zeros([self.rows, self.cols], dtype = np.uint8) # Init the mask
 
 	def calc_beta(self):
 		'''Calculate Beta -- The Exp Term of Smooth Parameter in Gibbs Energy'''
@@ -260,11 +269,29 @@ class GCClient:
 			self._rect = [min(self._ix,x),min(self._iy,y),abs(self._ix-x),abs(self._iy-y)]
 			# print(" Now press the key 'n' a few times until no further change \n")
 
-		self._mask = np.zeros([self.rows, self.cols], dtype = np.uint8) # Init the mask
 		self._mask[:, :] = self._GC_BGD
 		# Notice : The x and y axis in CV2 are inversed to those in numpy.
 		self._mask[self._rect[1]+self._thickness:self._rect[1]+self._rect[3]-self._thickness, self._rect[0]+self._thickness:self._rect[0]+self._rect[2]-self._thickness] = self._GC_PR_FGD
 		self._mask0 = self._mask.copy()
+
+		if event == cv2.EVENT_LBUTTONDOWN:
+			if self._rect_over == False:
+				print('Draw a rectangle on the image first.')
+			else:
+				self._drawing == True
+				cv2.circle(self.img, (x, y), self._thickness, self._DRAW_VAL['color'], -1)
+				cv2.circle(self._mask, (x, y), self._thickness, self._DRAW_VAL['val'], -1)
+
+		elif event == cv2.EVENT_MOUSEMOVE:
+			if self._drawing == True:
+				cv2.circle(self.img, (x, y), self._thickness, self._DRAW_VAL['color'], -1)
+				cv2.circle(self._mask, (x, y), self._thickness, self._DRAW_VAL['val'], -1)
+
+		elif event == cv2.EVENT_LBUTTONUP:
+			if self._drawing == True:
+				self._drawing = False
+				cv2.circle(self.img, (x, y), self._thickness, self._DRAW_VAL['color'], -1)
+				cv2.circle(self._mask, (x, y), self._thickness, self._DRAW_VAL['val'], -1)
 
 	@timeit
 	def init_with_kmeans(self):
@@ -433,10 +460,10 @@ class GCClient:
 		# output[FGD] = self.img[FGD]
 		# output = output.astype(np.uint8)
 		output = cv2.bitwise_and(self.img2, self.img2, mask = FGD)
-		print('Press N to continue')
+		# print('Press N to continue')
 		return output
 
-	def update_mask_by_user(self):
+	# def update_mask_by_user(self):
 		
 
 
@@ -453,6 +480,8 @@ if __name__ == '__main__':
 	cv2.moveWindow('input',img.shape[0]+100, img.shape[1]+100)
 
 	count = 0
+	print("Instructions: \n")
+	print("Draw a rectangle around the object using right mouse button \n")
 
 	while(1):
 		cv2.imshow('output', output)
@@ -467,7 +496,24 @@ if __name__ == '__main__':
 				GC.run()
 				count += 1
 			else:
-				GC.iter(2)
-			output = GC.show(output)
+				GC.iter(1)
+			# output = GC.show(output)
+
+		elif k == ord('0'):
+			print('Mark background regions with left mouse button \n')
+			GC._DRAW_VAL = GC._DRAW_BG
+			GC.iter(1)
+			# output = GC.show(output)
+
+		elif k == ord('1'):
+			print('Mark foreground regions with left mouse button \n')
+			GC._DRAW_VAL = GC._DRAW_FG
+			GC.iter(1)
+			# output = GC.show(output)
+	
+		FGD = np.where((GC._mask == 1) + (GC._mask == 3), 255, 0).astype('uint8')
+
+		output = cv2.bitwise_and(GC.img2, GC.img2, mask = FGD)
+
 
 	cv2.destroyAllWindows()
