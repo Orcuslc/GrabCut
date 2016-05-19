@@ -52,6 +52,9 @@ a = cv2.setMouseCallback('input', GC.init_mask)
 cv2.moveWindow('input', img.shape[0]+10, img.shape[1]+10)
 
 count = 0
+flag = False
+print("Instructions: \n")
+print("Draw a rectangle around the object using right mouse button \n")
 
 while True:
 	cv2.imshow('output', output)
@@ -69,6 +72,39 @@ while True:
 			count += 1
 		else:
 			GC.iter(iteration_count)
-		output = GC.show(output)
+		flag = True
+	
+	elif k == ord('0'):
+		print('Mark background regions with left mouse button \n')
+		GC._DRAW_VAL = GC._DRAW_BG
+		GC.iter(1)
+		flag = True
+		# output = GC.show(output)
+
+	elif k == ord('1'):
+		print('Mark foreground regions with left mouse button \n')
+		GC._DRAW_VAL = GC._DRAW_FG
+		GC.iter(1)
+		flag = True
+		# output = GC.show(output)
+
+	elif k == ord('2'):
+		print('Mark prob. background regions with left mouse button \n')
+		GC._DRAW_VAL = GC._DRAW_PR_BG
+		GC.iter(1)
+		flag = True
+
+	elif k == ord('3'):
+		print('Mark prob. foreground regions with left mouse button \n')
+		GC._DRAW_VAL = GC._DRAW_PR_FG
+		GC.iter(1)
+		flag = True
+
+
+	FGD = np.where((GC._mask == 1) + (GC._mask == 3), 255, 0).astype('uint8')
+	
+	if flag == True:
+		output = cv2.bitwise_and(GC.img2, GC.img2, mask = FGD)
+		flag = False
 
 cv2.destroyAllWindows()
