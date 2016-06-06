@@ -296,7 +296,7 @@ class GCClient:
 				cv2.circle(self.img, (x, y), self._thickness, self._DRAW_VAL['color'], -1)
 				cv2.circle(self._mask, (x, y), self._thickness, self._DRAW_VAL['val'], -1)
 
-	@timeit
+	# @timeit
 	def init_with_kmeans(self):
 		print(self.cols*self.rows)
 		print(len(list(np.where(self._mask == 0))[1]))
@@ -340,7 +340,7 @@ class GCClient:
 
 	'''The first step of the iteration in the paper: Assign components of GMMs to pixels,
 		(the kn in the paper), which is saved in self.components_index'''
-	@timeit
+	# @timeit
 	def assign_GMM_components(self):
 		self.components_index = np.zeros([self.rows, self.cols], dtype = np.uint)
 		# self.components_index[self._bgd] = [i[0] for i in self.BGD_GMM.vec_pix_comp(self.img[self._bgd])]
@@ -351,7 +351,7 @@ class GCClient:
 				self.components_index[y, x] = self.BGD_GMM.most_likely_pixel_component(pixel) if (self._mask[y, x] \
 					== self._GC_BGD or self._mask[y, x] == self._GC_PR_BGD) else self.FGD_GMM.most_likely_pixel_component(pixel)
 
-	@timeit
+	# @timeit
 	def _assign_GMM_components(self):
 		self.components_index = np.zeros([self.rows, self.cols], dtype = np.uint)
 		self.components_index[self._bgd] = [i[0] for i in self.BGD_GMM.vec_pix_comp(self.img[self._bgd])]
@@ -360,7 +360,7 @@ class GCClient:
 
 
 	'''The second step in the iteration: Learn the parameters from GMM models'''
-	@timeit
+	# @timeit
 	def learn_GMM_parameters(self):
 		for ci in range(self.k):
 			# The places where the pixel belongs to the ci_th model and background model.
@@ -373,7 +373,7 @@ class GCClient:
 		self.BGD_GMM.learning()
 		self.FGD_GMM.learning()
 
-	@timeit
+	# @timeit
 	def construct_gcgraph(self, lam):
 		'''Construct a GCGraph with the Gibbs Energy'''
 		'''The vertexs of the graph are the pixels, and the edges are constructed by two parts,
@@ -420,7 +420,7 @@ class GCClient:
 					w = self.upright_weight[y, x]
 					self.graph.add_edges(vertex_index, vertex_index-self.cols+1, w, w)
 
-	@timeit
+	# @timeit
 	def estimate_segmentation(self):
 		a =  self.graph.max_flow()
 		for y in range(self.rows):
@@ -532,6 +532,9 @@ if __name__ == '__main__':
 		elif k == ord('s'):
 			cv2.imwrite('%s_gc.jpg'%('hyh'), output)
 			print("Result saved as image %s_gc.jpg"%('hyh'))
+
+		elif k == ord('r'):
+			GC.__init__(img, k = 5)
 
 		FGD = np.where((GC._mask == 1) + (GC._mask == 3), 255, 0).astype('uint8')
 		# if flag == True:

@@ -92,6 +92,9 @@ while True:
 		print('Mark prob. foreground regions with left mouse button \n')
 		GC._DRAW_VAL = GC._DRAW_PR_FG
 
+	elif k == ord('r'):
+		GC.__init__(img, component_count)
+
 
 	FGD = np.where((GC._mask == 1) + (GC._mask == 3), 255, 0).astype('uint8')
 	
