@@ -109,7 +109,7 @@ class GMM:
 				self.cov_det[i] = np.linalg.det(self.covs[i])
 		self.cov_inv = np.asarray([np.linalg.inv(cov) for cov in self.covs])
 
-	@timeit
+	# @timeit
 	def learning(self):
 		variance = 0.01
 		for ci in range(self.k):
@@ -171,6 +171,8 @@ class GCClient:
 		self._DRAW_VAL = None
 
 		self._mask = np.zeros([self.rows, self.cols], dtype = np.uint8) # Init the mask
+		self._mask[:, :] = self._GC_BGD
+
 
 	def calc_beta(self):
 		'''Calculate Beta -- The Exp Term of Smooth Parameter in Gibbs Energy'''
@@ -261,6 +263,7 @@ class GCClient:
 		    	self.img = self.img2.copy()
 		    	cv2.rectangle(self.img,(self._ix,self._iy),(x,y),self._BLUE,2)
 		    	self._rect = [min(self._ix,x),min(self._iy,y),abs(self._ix-x),abs(self._iy-y)]
+		    	self.rect_or_mask = 0
 
 		elif event == cv2.EVENT_RBUTTONUP:
 			self._rectangle = False
@@ -268,11 +271,11 @@ class GCClient:
 			cv2.rectangle(self.img,(self._ix,self._iy),(x,y),self._BLUE,2)
 			self._rect = [min(self._ix,x),min(self._iy,y),abs(self._ix-x),abs(self._iy-y)]
 			# print(" Now press the key 'n' a few times until no further change \n")
+			self.rect_or_mask = 0
+			self._mask[self._rect[1]+self._thickness:self._rect[1]+self._rect[3]-self._thickness, self._rect[0]+self._thickness:self._rect[0]+self._rect[2]-self._thickness] = self._GC_PR_FGD
 
-		self._mask[:, :] = self._GC_BGD
+
 		# Notice : The x and y axis in CV2 are inversed to those in numpy.
-		self._mask[self._rect[1]+self._thickness:self._rect[1]+self._rect[3]-self._thickness, self._rect[0]+self._thickness:self._rect[0]+self._rect[2]-self._thickness] = self._GC_PR_FGD
-		self._mask0 = self._mask.copy()
 
 		if event == cv2.EVENT_LBUTTONDOWN:
 			if self._rect_over == False:
@@ -494,10 +497,12 @@ if __name__ == '__main__':
 		if k == 27:
 			break
 		elif k == ord('n'):
-			if count == 0:
+			print(""" For finer touchups, mark foreground and background after pressing keys 0-3
+			and again press 'n' \n""")
+			if GC.rect_or_mask == 0:
 				GC.run()
-				count += 1
-			else:
+				GC.rect_or_mask = 1
+			elif GC.rect_or_mask == 1:
 				GC.iter(1)
 			flag = True
 			# output = GC.show(output)
@@ -505,27 +510,23 @@ if __name__ == '__main__':
 		elif k == ord('0'):
 			print('Mark background regions with left mouse button \n')
 			GC._DRAW_VAL = GC._DRAW_BG
-			GC.iter(1)
 			flag = True
 			# output = GC.show(output)
 
 		elif k == ord('1'):
 			print('Mark foreground regions with left mouse button \n')
 			GC._DRAW_VAL = GC._DRAW_FG
-			GC.iter(1)
 			flag = True
 			# output = GC.show(output)
 
 		elif k == ord('2'):
 			print('Mark prob. background regions with left mouse button \n')
 			GC._DRAW_VAL = GC._DRAW_PR_BG
-			GC.iter(1)
 			flag = True
 
 		elif k == ord('3'):
 			print('Mark prob. foreground regions with left mouse button \n')
 			GC._DRAW_VAL = GC._DRAW_PR_FG
-			GC.iter(1)
 			flag = True
 
 		elif k == ord('s'):
@@ -533,9 +534,9 @@ if __name__ == '__main__':
 			print("Result saved as image %s_gc.jpg"%('hyh'))
 
 		FGD = np.where((GC._mask == 1) + (GC._mask == 3), 255, 0).astype('uint8')
-		if flag == True:
-			output = cv2.bitwise_and(GC.img2, GC.img2, mask = FGD)
-			flag = False
+		# if flag == True:
+		output = cv2.bitwise_and(GC.img2, GC.img2, mask = FGD)
+			# flag = False
 
 
 	cv2.destroyAllWindows()
