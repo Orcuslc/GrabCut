@@ -472,7 +472,7 @@ class GCClient:
 
 
 if __name__ == '__main__':
-	img = cv2.imread('hyh.jpg', cv2.IMREAD_COLOR)
+	img = cv2.imread('test\\hyh.jpg', cv2.IMREAD_COLOR)
 	output = np.zeros(img.shape,np.uint8)
 
 	GC = GCClient(img, k = 5)
