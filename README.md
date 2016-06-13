@@ -1,5 +1,5 @@
 # GrabCut
-A implementation of ["GrabCut": interactive foreground extraction using iterated graph cuts](http://dl.acm.org/citation.cfm?id=1015720).
+An implementation of ["GrabCut": interactive foreground extraction using iterated graph cuts](http://dl.acm.org/citation.cfm?id=1015720).
 
 Under GNU General Public License.
 
