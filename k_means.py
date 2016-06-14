@@ -1,7 +1,7 @@
 # K-means
 import numpy as np
 import random
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 
 def get_size(A):
 	return list(A.shape)[:2]
