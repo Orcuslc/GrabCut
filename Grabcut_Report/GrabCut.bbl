@@ -1,0 +1,14 @@
+\begin{thebibliography}{1}
+
+\bibitem{bradski2008learning}
+Gary Bradski and Adrian Kaehler.
+\newblock {\em Learning OpenCV: Computer vision with the OpenCV library}.
+\newblock " O'Reilly Media, Inc.", 2008.
+
+\bibitem{rother2004grabcut}
+Carsten Rother, Vladimir Kolmogorov, and Andrew Blake.
+\newblock Grabcut: Interactive foreground extraction using iterated graph cuts.
+\newblock In {\em ACM transactions on graphics (TOG)}, volume~23, pages
+  309--314. ACM, 2004.
+
+\end{thebibliography}
